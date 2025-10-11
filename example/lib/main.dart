@@ -446,7 +446,7 @@ This document was created to test the robustness of Markdown parsers and to ensu
                                 // ),
                                 child: Builder(
                                   builder: (context) {
-                                    Widget child = GptMarkdown(
+                                    Widget child = GptMarkdownLight(
                                       data,
                                       textDirection: _direction,
                                       onLinkTap: (url, title) {
@@ -548,7 +548,7 @@ This document was created to test the robustness of Markdown parsers and to ensu
                                             ..insert(1, "|---|");
                                           tableString =
                                               tableStringList.join("\n");
-                                          return GptMarkdown(tableString);
+                                          return GptMarkdownLight(tableString);
                                         }
                                         var controller = ScrollController();
                                         Widget child = Math.tex(

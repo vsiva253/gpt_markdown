@@ -1,28 +1,8 @@
-import 'package:flutter/material.dart';
-import 'package:gpt_markdown/custom_widgets/markdown_config.dart';
-
-import 'package:flutter/foundation.dart';
-import 'package:flutter_math_fork/flutter_math.dart';
-import 'package:gpt_markdown/custom_widgets/custom_divider.dart';
-import 'package:gpt_markdown/custom_widgets/custom_error_image.dart';
-import 'package:gpt_markdown/custom_widgets/custom_rb_cb.dart';
-import 'package:gpt_markdown/custom_widgets/selectable_adapter.dart';
-import 'package:gpt_markdown/custom_widgets/unordered_ordered_list.dart';
-import 'dart:math';
-
-import 'custom_widgets/code_field.dart';
-import 'custom_widgets/indent_widget.dart';
-import 'custom_widgets/link_button.dart';
-
-part 'theme.dart';
-part 'markdown_component.dart';
-part 'md_widget.dart';
-part 'gpt_markdown_light.dart';
-part 'markdown_smart_components.dart';
+part of 'gpt_markdown.dart';
 
 /// This widget create a full markdown widget as a column view.
-class GptMarkdown extends StatelessWidget {
-  const GptMarkdown(
+class GptMarkdownLight extends StatefulWidget {
+  const GptMarkdownLight(
     this.data, {
     super.key,
     this.style,
@@ -150,6 +130,11 @@ class GptMarkdown extends StatelessWidget {
   /// ```
   final List<MarkdownComponent>? inlineComponents;
 
+  @override
+  State<GptMarkdownLight> createState() => _GptMarkdownLightState();
+}
+
+class _GptMarkdownLightState extends State<GptMarkdownLight> {
   /// A method to remove extra lines inside block LaTeX.
   // String _removeExtraLinesInsideBlockLatex(String text) {
   //   return text.replaceAllMapped(
@@ -163,8 +148,8 @@ class GptMarkdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String tex = data.trim();
-    if (useDollarSignsForLatex) {
+    String tex = widget.data.trim();
+    if (widget.useDollarSignsForLatex) {
       tex = tex.replaceAllMapped(
         RegExp(r"(?<!\\)\$\$(.*?)(?<!\\)\$\$", dotAll: true),
         (match) => "\\[${match[1] ?? ""}\\]",
@@ -182,33 +167,34 @@ class GptMarkdown extends StatelessWidget {
         );
       }
     }
+    var config = GptMarkdownConfig(
+      textDirection: widget.textDirection,
+      style: widget.style,
+      onLinkTap: widget.onLinkTap,
+      textAlign: widget.textAlign,
+      textScaler: widget.textScaler,
+      followLinkColor: widget.followLinkColor,
+      latexWorkaround: widget.latexWorkaround,
+      latexBuilder: widget.latexBuilder,
+      codeBuilder: widget.codeBuilder,
+      maxLines: widget.maxLines,
+      overflow: widget.overflow,
+      sourceTagBuilder: widget.sourceTagBuilder,
+      highlightBuilder: widget.highlightBuilder,
+      linkBuilder: widget.linkBuilder,
+      imageBuilder: widget.imageBuilder,
+      orderedListBuilder: widget.orderedListBuilder,
+      unOrderedListBuilder: widget.unOrderedListBuilder,
+      components: widget.components,
+      inlineComponents: widget.inlineComponents,
+      tableBuilder: widget.tableBuilder,
+    );
     // tex = _removeExtraLinesInsideBlockLatex(tex);
     return ClipRRect(
-      child: MdWidget(
-        context,
-        tex,
-        true,
-        config: GptMarkdownConfig(
-          textDirection: textDirection,
-          style: style,
-          onLinkTap: onLinkTap,
-          textAlign: textAlign,
-          textScaler: textScaler,
-          followLinkColor: followLinkColor,
-          latexWorkaround: latexWorkaround,
-          latexBuilder: latexBuilder,
-          codeBuilder: codeBuilder,
-          maxLines: maxLines,
-          overflow: overflow,
-          sourceTagBuilder: sourceTagBuilder,
-          highlightBuilder: highlightBuilder,
-          linkBuilder: linkBuilder,
-          imageBuilder: imageBuilder,
-          orderedListBuilder: orderedListBuilder,
-          unOrderedListBuilder: unOrderedListBuilder,
-          components: components,
-          inlineComponents: inlineComponents,
-          tableBuilder: tableBuilder,
+      child: Text.rich(
+        TextSpan(
+          children: generateLight(context, tex, config, true),
+          style: config.style,
         ),
       ),
     );
