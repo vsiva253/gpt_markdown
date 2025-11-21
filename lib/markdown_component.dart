@@ -1163,13 +1163,13 @@ class TableMd extends BlockMd {
                             // Apply alignment based on column alignment
                             Widget content = Padding(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
+                                horizontal: 16,
+                                vertical: 10,
                               ),
                               child: MdWidget(
                                 context,
                                 (e[index] ?? "").trim(),
-                                false,
+                                true, // Changed from false to true to enable LaTeX rendering
                                 config: config,
                               ),
                             );
@@ -1209,7 +1209,7 @@ class TableMd extends BlockMd {
 
 class CodeBlockMd extends BlockMd {
   @override
-  String get expString => r"```(.*?)\n((.*?)(:?\n\s*?```)|(.*)(:?\n```)?)$";
+  String get expString => r"```(.*?)\n([\s\S]*?)\n```";
   @override
   Widget build(
     BuildContext context,

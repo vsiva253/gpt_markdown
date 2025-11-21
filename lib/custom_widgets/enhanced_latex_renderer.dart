@@ -37,7 +37,9 @@ class EnhancedLatexRenderer extends StatelessWidget {
       textScaleFactor: 1,
       settings: const TexParserSettings(strict: Strict.ignore),
       options: MathOptions(
-        sizeUnderTextStyle: MathSize.large, // Use large for both inline and display to match default behavior
+        sizeUnderTextStyle:
+            MathSize
+                .large, // Use large for both inline and display to match default behavior
         color: textStyle.color ?? theme.colorScheme.onSurface,
         fontSize: textStyle.fontSize ?? theme.textTheme.bodyMedium?.fontSize,
         mathFontOptions: FontOptions(
@@ -84,9 +86,9 @@ class EnhancedLatexRenderer extends StatelessWidget {
       },
     );
 
-    // For inline math, return as-is (no scroll needed)
+    // For inline math, wrap in ClipRect to prevent sub-pixel overflows
     if (isInline) {
-      return mathWidget;
+      return ClipRect(child: mathWidget);
     }
 
     // For display math, wrap in container with horizontal scroll
