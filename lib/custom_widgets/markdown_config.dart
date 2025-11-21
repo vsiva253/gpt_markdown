@@ -93,6 +93,12 @@ class GptMarkdownConfig {
     this.components,
     this.inlineComponents,
     this.tableBuilder,
+    this.currentReadingBlockIndex,
+    this.readingHighlightColor,
+    this.sentenceHighlightMap,
+    this.currentWordIndex,
+    this.blockWordRanges,
+    this.currentWordHighlightColor,
   });
 
   /// The direction of the text.
@@ -155,6 +161,31 @@ class GptMarkdownConfig {
   /// The table builder.
   final TableBuilder? tableBuilder;
 
+  /// Index of the block that is currently being read by TTS.
+  /// If null, no highlight.
+  /// For sentence-level highlighting, this is the global sentence index.
+  final int? currentReadingBlockIndex;
+
+  /// Background color for the highlighted block.
+  final Color? readingHighlightColor;
+  
+  /// Map of paragraph index to sentence index within that paragraph for sentence-level highlighting.
+  /// If null, paragraph-level highlighting is used.
+  /// Key: paragraph index, Value: sentence index within that paragraph (0-based)
+  final Map<int, int>? sentenceHighlightMap;
+  
+  /// Current word index for word-level highlighting within blocks.
+  /// If null, only block-level highlighting is used.
+  final int? currentWordIndex;
+  
+  /// Map of block index to word index range for word-level highlighting.
+  /// Key: block index, Value: [startWordIndex, endWordIndex] (inclusive)
+  /// Used to determine which words belong to which block.
+  final Map<int, List<int>>? blockWordRanges;
+  
+  /// Color for highlighting the current word (more prominent than block highlight).
+  final Color? currentWordHighlightColor;
+
   /// A copy of the configuration with the specified parameters.
   GptMarkdownConfig copyWith({
     TextStyle? style,
@@ -177,6 +208,12 @@ class GptMarkdownConfig {
     final List<MarkdownComponent>? components,
     final List<MarkdownComponent>? inlineComponents,
     final TableBuilder? tableBuilder,
+    final int? currentReadingBlockIndex,
+    final Color? readingHighlightColor,
+    final Map<int, int>? sentenceHighlightMap,
+    final int? currentWordIndex,
+    final Map<int, List<int>>? blockWordRanges,
+    final Color? currentWordHighlightColor,
   }) {
     return GptMarkdownConfig(
       style: style ?? this.style,
@@ -199,6 +236,12 @@ class GptMarkdownConfig {
       components: components ?? this.components,
       inlineComponents: inlineComponents ?? this.inlineComponents,
       tableBuilder: tableBuilder ?? this.tableBuilder,
+      currentReadingBlockIndex: currentReadingBlockIndex ?? this.currentReadingBlockIndex,
+      readingHighlightColor: readingHighlightColor ?? this.readingHighlightColor,
+      sentenceHighlightMap: sentenceHighlightMap ?? this.sentenceHighlightMap,
+      currentWordIndex: currentWordIndex ?? this.currentWordIndex,
+      blockWordRanges: blockWordRanges ?? this.blockWordRanges,
+      currentWordHighlightColor: currentWordHighlightColor ?? this.currentWordHighlightColor,
     );
   }
 
@@ -222,6 +265,12 @@ class GptMarkdownConfig {
         maxLines == other.maxLines &&
         overflow == other.overflow &&
         followLinkColor == other.followLinkColor &&
+        currentReadingBlockIndex == other.currentReadingBlockIndex &&
+        readingHighlightColor == other.readingHighlightColor &&
+        _mapEquals(sentenceHighlightMap, other.sentenceHighlightMap) &&
+        currentWordIndex == other.currentWordIndex &&
+        _mapListEquals(blockWordRanges, other.blockWordRanges) &&
+        currentWordHighlightColor == other.currentWordHighlightColor &&
         // latexWorkaround == other.latexWorkaround &&
         // components == other.components &&
         // inlineComponents == other.inlineComponents &&
@@ -235,5 +284,33 @@ class GptMarkdownConfig {
         // highlightBuilder == other.highlightBuilder &&
         // onLinkTap == other.onLinkTap &&
         textDirection == other.textDirection;
+  }
+  
+  /// Helper method to compare maps for equality
+  bool _mapEquals(Map<int, int>? a, Map<int, int>? b) {
+    if (a == null && b == null) return true;
+    if (a == null || b == null) return false;
+    if (a.length != b.length) return false;
+    for (final key in a.keys) {
+      if (a[key] != b[key]) return false;
+    }
+    return true;
+  }
+  
+  bool _mapListEquals(Map<int, List<int>>? a, Map<int, List<int>>? b) {
+    if (a == null && b == null) return true;
+    if (a == null || b == null) return false;
+    if (a.length != b.length) return false;
+    for (final key in a.keys) {
+      final listA = a[key];
+      final listB = b[key];
+      if (listA == null && listB == null) continue;
+      if (listA == null || listB == null) return false;
+      if (listA.length != listB.length) return false;
+      for (int i = 0; i < listA.length; i++) {
+        if (listA[i] != listB[i]) return false;
+      }
+    }
+    return true;
   }
 }

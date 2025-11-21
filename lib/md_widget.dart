@@ -26,9 +26,19 @@ class MdWidget extends StatefulWidget {
 
 class _MdWidgetState extends State<MdWidget> {
   List<InlineSpan> list = [];
+  List<String> blocks = [];
+  
   @override
   void initState() {
     super.initState();
+    _updateContent();
+  }
+
+  void _updateContent() {
+    // Split markdown into blocks (paragraphs separated by double newlines)
+    blocks = _splitIntoBlocks(widget.exp);
+    
+    // Generate spans for the full text (for backward compatibility)
     list = MarkdownComponent.generate(
       widget.context,
       widget.exp,
@@ -42,23 +52,82 @@ class _MdWidgetState extends State<MdWidget> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.exp != widget.exp ||
         !oldWidget.config.isSame(widget.config)) {
-      list = MarkdownComponent.generate(
-        context,
-        widget.exp,
-        widget.config,
-        widget.includeGlobalComponents,
-      );
+      _updateContent();
     }
   }
 
+  /// Splits markdown text into blocks (paragraphs separated by double newlines)
+  List<String> _splitIntoBlocks(String text) {
+    if (text.trim().isEmpty) return [];
+    
+    // Split on double newlines or more
+    final parts = text.split(RegExp(r'\n\s*\n+'));
+    
+    return parts
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty)
+        .toList();
+  }
+
+  /// Wraps a widget with reading highlight if it matches the current block index
+  /// Uses AnimatedContainer for smooth transitions
+  Widget _wrapWithReadingHighlight(Widget child, int blockIndex) {
+    final highlightIndex = widget.config.currentReadingBlockIndex;
+    if (highlightIndex == null || highlightIndex != blockIndex) {
+      return child;
+    }
+
+    // Use AnimatedContainer for smooth transitions (200ms fade)
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+      decoration: BoxDecoration(
+        color: widget.config.readingHighlightColor ??
+            Colors.yellow.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      child: child,
+    );
+  }
+  
+
   @override
   Widget build(BuildContext context) {
-    // List<InlineSpan> list = MarkdownComponent.generate(
-    //   context,
-    //   widget.exp,
-    //   widget.config,
-    //   widget.includeGlobalComponents,
-    // );
+    // If we have block highlighting enabled, render blocks separately
+    if (widget.config.currentReadingBlockIndex != null && blocks.isNotEmpty) {
+      final children = <Widget>[];
+      int blockIndex = 0;
+
+      for (final block in blocks) {
+        // Generate spans for this block
+        final blockSpans = MarkdownComponent.generate(
+          context,
+          block,
+          widget.config,
+          widget.includeGlobalComponents,
+        );
+
+        final blockWidget = widget.config.getRich(
+          TextSpan(
+            children: blockSpans,
+            style: widget.config.style?.copyWith(),
+          ),
+        );
+
+        final wrapped = _wrapWithReadingHighlight(blockWidget, blockIndex);
+        children.add(wrapped);
+        
+        blockIndex++;
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      );
+    }
+
+    // Default behavior: render as single rich text (backward compatible)
     return widget.config.getRich(
       TextSpan(children: list, style: widget.config.style?.copyWith()),
     );
