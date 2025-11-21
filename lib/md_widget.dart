@@ -57,16 +57,40 @@ class _MdWidgetState extends State<MdWidget> {
   }
 
   /// Splits markdown text into blocks (paragraphs separated by double newlines)
+  /// Preserves code blocks as single units (doesn't split them)
   List<String> _splitIntoBlocks(String text) {
     if (text.trim().isEmpty) return [];
     
-    // Split on double newlines or more
-    final parts = text.split(RegExp(r'\n\s*\n+'));
+    // First, extract code blocks and replace them with placeholders
+    final codeBlockPattern = RegExp(r'```[\s\S]*?```', multiLine: true);
+    final codeBlocks = <String>[];
+    final placeholders = <String>[];
     
-    return parts
-        .map((p) => p.trim())
+    String processedText = text.replaceAllMapped(codeBlockPattern, (match) {
+      final codeBlock = match.group(0) ?? '';
+      codeBlocks.add(codeBlock);
+      final placeholder = '___CODE_BLOCK_${codeBlocks.length - 1}___';
+      placeholders.add(placeholder);
+      return placeholder;
+    });
+    
+    // Now split on double newlines (code blocks are protected)
+    final parts = processedText.split(RegExp(r'\n\s*\n+'));
+    
+    // Restore code blocks in each part
+    final blocks = parts
+        .map((p) {
+          // Restore code blocks
+          String restored = p;
+          for (int i = 0; i < placeholders.length; i++) {
+            restored = restored.replaceAll(placeholders[i], codeBlocks[i]);
+          }
+          return restored.trim();
+        })
         .where((p) => p.isNotEmpty)
         .toList();
+    
+    return blocks;
   }
 
   /// Wraps a widget with reading highlight if it matches the current block index

@@ -114,7 +114,7 @@ abstract class BlockMd extends MarkdownComponent {
 
   @override
   RegExp get exp =>
-      RegExp(r'^\ *?' + expString + r"$", dotAll: true, multiLine: true);
+      RegExp(r'^\s*?' + expString + r"$", dotAll: true, multiLine: true);
 
   String get expString;
 
@@ -1092,88 +1092,115 @@ class TableMd extends BlockMd {
     }
 
     final controller = ScrollController();
-    return Scrollbar(
-      controller: controller,
-      child: SingleChildScrollView(
-        controller: controller,
-        scrollDirection: Axis.horizontal,
-        child: Table(
-          textDirection: config.textDirection,
-          defaultColumnWidth: CustomTableColumnWidth(),
-          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-          border: TableBorder.all(
-            width: 1,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-          children:
-              value
-                  .asMap()
-                  .entries
-                  .where((entry) {
-                    // Skip the separator row (second row) from rendering
-                    if (hasHeader && entry.key == 1) {
-                      return false;
-                    }
-                    return true;
-                  })
-                  .map<TableRow>(
-                    (entry) => TableRow(
-                      decoration:
-                          (hasHeader && entry.key == 0)
-                              ? BoxDecoration(
-                                color:
-                                    Theme.of(
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Scrollbar(
+          controller: controller,
+          child: SingleChildScrollView(
+            controller: controller,
+            scrollDirection: Axis.horizontal,
+            child: Table(
+              textDirection: config.textDirection,
+              defaultColumnWidth: CustomTableColumnWidth(),
+              defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+              border: TableBorder(
+                horizontalInside: BorderSide(
+                  color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+                  width: 1,
+                ),
+                verticalInside: BorderSide(
+                  color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
+              children:
+                  value
+                      .asMap()
+                      .entries
+                      .where((entry) {
+                        // Skip the separator row (second row) from rendering
+                        if (hasHeader && entry.key == 1) {
+                          return false;
+                        }
+                        return true;
+                      })
+                      .map<TableRow>((entry) {
+                        final index = entry.key;
+                        final isHeader = hasHeader && index == 0;
+                        // Adjust index for zebra striping if header exists (skip separator row index 1)
+                        final stripeIndex =
+                            hasHeader && index > 1 ? index - 1 : index;
+
+                        return TableRow(
+                          decoration: BoxDecoration(
+                            color:
+                                isHeader
+                                    ? Theme.of(
                                       context,
-                                    ).colorScheme.surfaceContainerHighest,
-                              )
-                              : null,
-                      children: List.generate(maxCol, (index) {
-                        var e = entry.value;
-                        String data = e[index] ?? "";
-                        if (RegExp(r"^:?--+:?$").hasMatch(data.trim()) ||
-                            data.trim().isEmpty) {
-                          return const SizedBox();
-                        }
+                                    ).colorScheme.surfaceContainerHighest
+                                    : (stripeIndex % 2 == 0)
+                                    ? Colors.transparent
+                                    : Theme.of(context)
+                                        .colorScheme
+                                        .surfaceContainerHighest
+                                        .withOpacity(0.3),
+                          ),
+                          children: List.generate(maxCol, (index) {
+                            var e = entry.value;
+                            String data = e[index] ?? "";
+                            if (RegExp(r"^:?--+:?$").hasMatch(data.trim()) ||
+                                data.trim().isEmpty) {
+                              return const SizedBox();
+                            }
 
-                        // Apply alignment based on column alignment
-                        Widget content = Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          child: MdWidget(
-                            context,
-                            (e[index] ?? "").trim(),
-                            false,
-                            config: config,
-                          ),
+                            // Apply alignment based on column alignment
+                            Widget content = Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              child: MdWidget(
+                                context,
+                                (e[index] ?? "").trim(),
+                                false,
+                                config: config,
+                              ),
+                            );
+
+                            // Wrap with alignment widget
+                            switch (columnAlignments[index]) {
+                              case TextAlign.center:
+                                content = Center(child: content);
+                                break;
+                              case TextAlign.right:
+                                content = Align(
+                                  alignment: Alignment.centerRight,
+                                  child: content,
+                                );
+                                break;
+                              case TextAlign.left:
+                              default:
+                                content = Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: content,
+                                );
+                                break;
+                            }
+
+                            return content;
+                          }),
                         );
-
-                        // Wrap with alignment widget
-                        switch (columnAlignments[index]) {
-                          case TextAlign.center:
-                            content = Center(child: content);
-                            break;
-                          case TextAlign.right:
-                            content = Align(
-                              alignment: Alignment.centerRight,
-                              child: content,
-                            );
-                            break;
-                          case TextAlign.left:
-                          default:
-                            content = Align(
-                              alignment: Alignment.centerLeft,
-                              child: content,
-                            );
-                            break;
-                        }
-
-                        return content;
-                      }),
-                    ),
-                  )
-                  .toList(),
+                      })
+                      .toList(),
+            ),
+          ),
         ),
       ),
     );
@@ -1191,11 +1218,54 @@ class CodeBlockMd extends BlockMd {
   ) {
     String codes = this.exp.firstMatch(text)?[2] ?? "";
     String name = this.exp.firstMatch(text)?[1] ?? "";
+
+    // Calculate indentation of the block
+    int indentation = text.indexOf('```');
+    if (indentation < 0) indentation = 0;
+
+    // Clean up codes
+    // Remove the closing backticks and any preceding whitespace on that line
+    codes = codes.replaceAll(RegExp(r'\n\s*```$'), '');
+    // If not closed with newline, just remove backticks
     codes = codes.replaceAll(r"```", "");
+
+    // Strip indentation from each line
+    if (indentation > 0) {
+      final lines = codes.split('\n');
+      final strippedLines =
+          lines.map((line) {
+            if (line.length >= indentation &&
+                line.substring(0, indentation).trim().isEmpty) {
+              return line.substring(indentation);
+            }
+            return line;
+          }).toList();
+      codes = strippedLines.join('\n');
+    }
+
     bool closed = text.endsWith("```");
 
-    return config.codeBuilder?.call(context, name, codes, closed) ??
-        CodeField(name: name, codes: codes);
+    if (kDebugMode) {
+      if (codes.isNotEmpty || name.isNotEmpty) {
+        debugPrint(
+          '[CodeBlockMd] ✅ Detected code block: language="$name", code length=${codes.length}, closed=$closed, text length=${text.length}',
+        );
+      } else if (text.contains('```')) {
+        debugPrint(
+          '[CodeBlockMd] ⚠️ Code block markers found but regex did not match. Text preview: ${text.substring(0, text.length > 200 ? 200 : text.length)}...',
+        );
+      }
+    }
+
+    return config.codeBuilder?.call(context, name.trim(), codes, closed) ??
+        CodeBlockEnhanced(
+          code: codes,
+          language: name.trim(),
+          textStyle: config.style,
+          backgroundColor:
+              GptMarkdownTheme.of(context).codeBlockBackgroundColor,
+          headerColor: GptMarkdownTheme.of(context).codeBlockHeaderColor,
+        );
   }
 }
 

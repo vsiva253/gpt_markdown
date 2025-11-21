@@ -10,7 +10,7 @@ import 'package:gpt_markdown/custom_widgets/selectable_adapter.dart';
 import 'package:gpt_markdown/custom_widgets/unordered_ordered_list.dart';
 import 'dart:math';
 
-import 'custom_widgets/code_field.dart';
+import 'custom_widgets/code_block_enhanced.dart';
 import 'custom_widgets/indent_widget.dart';
 import 'custom_widgets/link_button.dart';
 
@@ -159,13 +159,13 @@ class GptMarkdown extends StatelessWidget {
 
   /// Background color for the highlighted block.
   final Color? readingHighlightColor;
-  
+
   /// Current word index for word-level highlighting within blocks.
   final int? currentWordIndex;
-  
+
   /// Map of block index to word index range for word-level highlighting.
   final Map<int, List<int>>? blockWordRanges;
-  
+
   /// Color for highlighting the current word (more prominent than block highlight).
   final Color? currentWordHighlightColor;
 
@@ -240,27 +240,27 @@ class GptMarkdown extends StatelessWidget {
 }
 
 /// Detects the primary language of the text content.
-/// 
+///
 /// Returns language code based on script detection:
 /// - 'te-IN' for Telugu
 /// - 'hi-IN' for Hindi
 /// - 'en-IN' for English (default)
-/// 
+///
 /// [text] - The text to analyze
-/// 
+///
 /// Returns a language code suitable for TTS
 String detectLanguageFromText(String text) {
   if (text.isEmpty) return 'en-IN';
-  
+
   // Telugu script range: U+0C00 to U+0C7F
   final teluguPattern = RegExp(r'[\u0C00-\u0C7F]');
   // Hindi script range: U+0900 to U+097F
   final hindiPattern = RegExp(r'[\u0900-\u097F]');
-  
+
   int teluguCount = 0;
   int hindiCount = 0;
   int totalChars = 0;
-  
+
   for (final char in text.runes) {
     final charStr = String.fromCharCode(char);
     if (teluguPattern.hasMatch(charStr)) {
@@ -273,58 +273,61 @@ String detectLanguageFromText(String text) {
       totalChars++;
     }
   }
-  
+
   // If we have significant Telugu characters, use Telugu
   if (teluguCount > 10 || (teluguCount > 0 && teluguCount > totalChars * 0.1)) {
     return 'te-IN';
   }
-  
+
   // If we have significant Hindi characters, use Hindi
   if (hindiCount > 10 || (hindiCount > 0 && hindiCount > totalChars * 0.1)) {
     return 'hi-IN';
   }
-  
+
   // Default to English
   return 'en-IN';
 }
 
 /// Debug function to compare raw markdown with extracted plain text.
-/// 
+///
 /// Use this to identify extraction issues:
 /// ```dart
 /// debugPlainText(markdown);
 /// ```
-/// 
+///
 /// This will print both the raw markdown and the extracted TTS text to the console.
 void debugPlainText(String markdown, {bool useDollarSignsForLatex = false}) {
   if (kDebugMode) {
     debugPrint('====== RAW MARKDOWN ======');
     debugPrint(markdown);
     debugPrint('\n====== TTS PLAIN TEXT ======');
-    final ttsText = gptMarkdownToPlainText(markdown, useDollarSignsForLatex: useDollarSignsForLatex);
+    final ttsText = gptMarkdownToPlainText(
+      markdown,
+      useDollarSignsForLatex: useDollarSignsForLatex,
+    );
     debugPrint(ttsText);
     debugPrint('\n====== END DEBUG ======\n');
   }
 }
 
 /// Normalizes a single block of plain text for TTS.
-/// 
+///
 /// This function applies safe, per-block normalization that:
 /// - Strips emojis (prevents stuck sections like "🎭2.")
 /// - Collapses internal whitespace
 /// - Trims the block
-/// 
+///
 /// This is designed to be applied to each block BEFORE joining blocks together,
 /// ensuring that the final `ttsText` is the single source of truth for all timing calculations.
-/// 
+///
 /// [blockText] - The plain text block to normalize
-/// 
+///
 /// Returns the normalized block text, or empty string if block becomes empty after normalization
 String normalizeBlockForTts(String blockText) {
   var text = blockText.trim();
-  
+
   if (text.isEmpty) return '';
-  
+
   // Strip emojis and symbols (prevents stuck sections and word splitting issues)
   // Covers most emoji ranges: Emoticons, Symbols, Pictographs, Transport, etc.
   text = text.replaceAll(
@@ -334,18 +337,18 @@ String normalizeBlockForTts(String blockText) {
     ),
     '',
   );
-  
+
   // Collapse internal whitespace (spaces and tabs)
   text = text.replaceAll(RegExp(r'[ \t]+'), ' ');
-  
+
   // Remove lines with only whitespace
   text = text.replaceAll(RegExp(r'^\s+$', multiLine: true), '');
-  
+
   return text.trim();
 }
 
 /// Converts markdown text to plain text suitable for text-to-speech.
-/// 
+///
 /// This function uses the same parsing logic as [GptMarkdown] to extract
 /// clean text content from markdown, handling all markdown elements appropriately:
 /// - Headings: extracts text content
@@ -361,24 +364,24 @@ String normalizeBlockForTts(String blockText) {
 /// - Checkboxes/Radio buttons: extracts text
 /// - Highlighted text: extracts text
 /// - Source tags: skipped
-/// 
+///
 /// Example:
 /// ```dart
 /// final markdown = "# Hello\nThis is **bold** text with a [link](https://example.com)";
 /// final plainText = gptMarkdownToPlainText(markdown);
 /// // Result: "Hello\nThis is bold text with a link"
 /// ```
-/// 
+///
 /// [markdown] - The markdown text to convert
 /// [useDollarSignsForLatex] - Whether to handle dollar signs for LaTeX (default: false)
-/// 
+///
 /// Returns a plain text string suitable for TTS with normalized spacing
 String gptMarkdownToPlainText(
   String markdown, {
   bool useDollarSignsForLatex = false,
 }) {
   String text = markdown.trim();
-  
+
   // Handle dollar sign LaTeX conversion (same as GptMarkdown widget)
   if (useDollarSignsForLatex) {
     text = text.replaceAllMapped(
@@ -398,15 +401,21 @@ String gptMarkdownToPlainText(
       );
     }
   }
-  
+
   final raw = _extractPlainText(text, true);
-  
+
   // Final cleanup for TTS - normalize spacing and newlines
   return raw
-      .replaceAll(RegExp(r'[ \t]+'), ' ')      // collapse spaces and tabs
-      .replaceAll(RegExp(r'\n{3,}'), '\n\n')   // max 2 newlines in a row
-      .replaceAll(RegExp(r'\n\s*\n\s*\n'), '\n\n')  // remove triple newlines with spaces
-      .replaceAll(RegExp(r'^\s+$', multiLine: true), '')  // remove lines with only whitespace
+      .replaceAll(RegExp(r'[ \t]+'), ' ') // collapse spaces and tabs
+      .replaceAll(RegExp(r'\n{3,}'), '\n\n') // max 2 newlines in a row
+      .replaceAll(
+        RegExp(r'\n\s*\n\s*\n'),
+        '\n\n',
+      ) // remove triple newlines with spaces
+      .replaceAll(
+        RegExp(r'^\s+$', multiLine: true),
+        '',
+      ) // remove lines with only whitespace
       .trim();
 }
 
@@ -414,10 +423,10 @@ String gptMarkdownToPlainText(
 class SpeechBlock {
   /// The text content of this block
   final String text;
-  
+
   /// The paragraph index this block belongs to (for reference)
   final int paragraphIndex;
-  
+
   /// The sentence index within the paragraph (0-based)
   final int sentenceIndex;
 
@@ -426,34 +435,49 @@ class SpeechBlock {
 }
 
 /// Splits text into sentences for smoother TTS reading.
-/// 
+///
 /// Sentences are split on sentence-ending punctuation (. ! ?) followed by whitespace.
 /// Handles common abbreviations to avoid false splits.
-/// 
+///
 /// Example:
 /// ```dart
 /// final sentences = splitIntoSentences("Hello world. How are you? I'm fine!");
 /// // Returns: ["Hello world.", "How are you?", "I'm fine!"]
 /// ```
-/// 
+///
 /// [text] - The text to split into sentences
-/// 
+///
 /// Returns a list of sentences
 List<String> splitIntoSentences(String text) {
   if (text.trim().isEmpty) return [];
-  
+
   // Common abbreviations that shouldn't split sentences
   // Add more as needed: Dr., Mr., Mrs., Ms., Prof., etc., U.S.A., a.m., p.m., etc.
   final abbreviations = [
-    r'Dr\.', r'Mr\.', r'Mrs\.', r'Ms\.', r'Prof\.', r'etc\.',
-    r'U\.S\.A\.', r'U\.S\.', r'a\.m\.', r'p\.m\.', r'e\.g\.', r'i\.e\.',
-    r'vs\.', r'Inc\.', r'Ltd\.', r'Jr\.', r'Sr\.', r'Ph\.D\.',
+    r'Dr\.',
+    r'Mr\.',
+    r'Mrs\.',
+    r'Ms\.',
+    r'Prof\.',
+    r'etc\.',
+    r'U\.S\.A\.',
+    r'U\.S\.',
+    r'a\.m\.',
+    r'p\.m\.',
+    r'e\.g\.',
+    r'i\.e\.',
+    r'vs\.',
+    r'Inc\.',
+    r'Ltd\.',
+    r'Jr\.',
+    r'Sr\.',
+    r'Ph\.D\.',
   ];
-  
+
   // Temporarily replace abbreviations with placeholders
   final Map<String, String> replacements = {};
   String processedText = text;
-  
+
   for (int i = 0; i < abbreviations.length; i++) {
     final abbrev = abbreviations[i];
     final placeholder = '__ABBREV_${i}__';
@@ -463,12 +487,12 @@ List<String> splitIntoSentences(String text) {
       return placeholder;
     });
   }
-  
+
   // Split on sentence-ending punctuation followed by whitespace
   // (?<=[.!?]) - positive lookbehind for sentence endings
   // \s+ - one or more whitespace characters
   final parts = processedText.split(RegExp(r'(?<=[.!?])\s+'));
-  
+
   // Restore abbreviations and clean up
   return parts
       .map((p) {
@@ -484,20 +508,20 @@ List<String> splitIntoSentences(String text) {
 }
 
 /// Splits markdown text into blocks (same logic as MdWidget for accurate highlighting).
-/// 
+///
 /// This splits the raw markdown first, then extracts text from each block.
 /// This ensures block indices match between rendering and TTS.
-/// 
+///
 /// [markdown] - The markdown text to convert
 /// [useDollarSignsForLatex] - Whether to handle dollar signs for LaTeX (default: false)
-/// 
+///
 /// Returns a list of speech blocks ready for TTS, with indices matching rendered blocks
 List<SpeechBlock> gptMarkdownToSpeechBlocks(
   String markdown, {
   bool useDollarSignsForLatex = false,
 }) {
   String text = markdown.trim();
-  
+
   // Handle dollar sign LaTeX conversion (same as GptMarkdown widget)
   if (useDollarSignsForLatex) {
     text = text.replaceAllMapped(
@@ -522,10 +546,12 @@ List<SpeechBlock> gptMarkdownToSpeechBlocks(
 
   // Split markdown into blocks FIRST (same as MdWidget._splitIntoBlocks)
   // This ensures block indices match between rendering and TTS
-  final markdownBlocks = text.split(RegExp(r'\n\s*\n+'))
-      .map((p) => p.trim())
-      .where((p) => p.isNotEmpty)
-      .toList();
+  final markdownBlocks =
+      text
+          .split(RegExp(r'\n\s*\n+'))
+          .map((p) => p.trim())
+          .where((p) => p.isNotEmpty)
+          .toList();
 
   if (markdownBlocks.isEmpty) return [];
 
@@ -533,34 +559,45 @@ List<SpeechBlock> gptMarkdownToSpeechBlocks(
   // Then split each paragraph into sentences for smoother TTS
   final speechBlocks = <SpeechBlock>[];
   int paragraphIndex = 0;
-  
+
   for (final markdownBlock in markdownBlocks) {
     final plainText = gptMarkdownToPlainText(
       markdownBlock,
       useDollarSignsForLatex: false, // Already processed above
     );
-    
+
     // Clean up the extracted text
-    final cleaned = plainText
-        .replaceAll(RegExp(r'[ \t]+'), ' ')  // collapse spaces
-        .replaceAll(RegExp(r'\n{3,}'), '\n\n')  // max 2 newlines
-        .trim();
-    
+    final cleaned =
+        plainText
+            .replaceAll(RegExp(r'[ \t]+'), ' ') // collapse spaces
+            .replaceAll(RegExp(r'\n{3,}'), '\n\n') // max 2 newlines
+            .trim();
+
     if (cleaned.isNotEmpty) {
       // Split paragraph into sentences for sentence-by-sentence reading
       final sentences = splitIntoSentences(cleaned);
-      
+
       if (sentences.isNotEmpty) {
         // Create a speech block for each sentence, tracking sentence index within paragraph
-        for (int sentenceIndex = 0; sentenceIndex < sentences.length; sentenceIndex++) {
-          speechBlocks.add(SpeechBlock(sentences[sentenceIndex], paragraphIndex, sentenceIndex));
+        for (
+          int sentenceIndex = 0;
+          sentenceIndex < sentences.length;
+          sentenceIndex++
+        ) {
+          speechBlocks.add(
+            SpeechBlock(
+              sentences[sentenceIndex],
+              paragraphIndex,
+              sentenceIndex,
+            ),
+          );
         }
       } else {
         // If no sentence endings found, treat the whole paragraph as one block
         speechBlocks.add(SpeechBlock(cleaned, paragraphIndex, 0));
       }
     }
-    
+
     paragraphIndex++;
   }
 
@@ -569,10 +606,11 @@ List<SpeechBlock> gptMarkdownToSpeechBlocks(
 
 /// Internal function to extract plain text from markdown using the same component logic
 String _extractPlainText(String text, bool includeGlobalComponents) {
-  final components = includeGlobalComponents
-      ? MarkdownComponent.globalComponents
-      : MarkdownComponent.inlineComponents;
-  
+  final components =
+      includeGlobalComponents
+          ? MarkdownComponent.globalComponents
+          : MarkdownComponent.inlineComponents;
+
   final buffer = StringBuffer();
   final regexes = components.map<String>((e) => e.exp.pattern);
   final combinedRegex = RegExp(
@@ -580,12 +618,12 @@ String _extractPlainText(String text, bool includeGlobalComponents) {
     multiLine: true,
     dotAll: true,
   );
-  
+
   text.splitMapJoin(
     combinedRegex,
     onMatch: (match) {
       final element = match[0] ?? "";
-      
+
       // Try to match each component
       for (final component in components) {
         final exp = RegExp(
@@ -593,9 +631,13 @@ String _extractPlainText(String text, bool includeGlobalComponents) {
           multiLine: component.exp.isMultiLine,
           dotAll: component.exp.isDotAll,
         );
-        
+
         if (exp.hasMatch(element)) {
-          final extracted = _extractTextFromComponent(component, element, includeGlobalComponents);
+          final extracted = _extractTextFromComponent(
+            component,
+            element,
+            includeGlobalComponents,
+          );
           buffer.write(extracted);
           return "";
         }
@@ -616,7 +658,7 @@ String _extractPlainText(String text, bool includeGlobalComponents) {
       return "";
     },
   );
-  
+
   return buffer.toString();
 }
 
@@ -628,14 +670,22 @@ String _extractTextFromComponent(
 ) {
   // Handle block components
   if (component is BlockMd) {
-    return _extractTextFromBlockComponent(component, text, includeGlobalComponents);
+    return _extractTextFromBlockComponent(
+      component,
+      text,
+      includeGlobalComponents,
+    );
   }
-  
+
   // Handle inline components
   if (component is InlineMd) {
-    return _extractTextFromInlineComponent(component, text, includeGlobalComponents);
+    return _extractTextFromInlineComponent(
+      component,
+      text,
+      includeGlobalComponents,
+    );
   }
-  
+
   return "";
 }
 
@@ -647,20 +697,22 @@ String _extractTextFromBlockComponent(
 ) {
   // Headings
   if (component is HTag) {
-    final match = RegExp(r"(?<hash>#{1,6})\ (?<data>[^\n]+?)$").firstMatch(text.trim());
+    final match = RegExp(
+      r"(?<hash>#{1,6})\ (?<data>[^\n]+?)$",
+    ).firstMatch(text.trim());
     if (match != null) {
       final data = match.namedGroup('data') ?? "";
       return "${_extractPlainText(data, false)}\n";
     }
   }
-  
+
   // Code blocks
   if (component is CodeBlockMd) {
     // Skip code blocks in TTS for cleaner speech
     // Code is typically not useful for text-to-speech
     return "";
   }
-  
+
   // Unordered lists
   if (component is UnOrderedList) {
     final match = RegExp(r"(?:\-|\*)\ ([^\n]+)$").firstMatch(text);
@@ -669,7 +721,7 @@ String _extractTextFromBlockComponent(
       return "• ${_extractPlainText(item, false)}";
     }
   }
-  
+
   // Ordered lists
   if (component is OrderedList) {
     final match = RegExp(r"([0-9]+)\.\ ([^\n]+)$").firstMatch(text);
@@ -679,31 +731,35 @@ String _extractTextFromBlockComponent(
       return "$number. ${_extractPlainText(item, false)}";
     }
   }
-  
+
   // Checkboxes
   if (component is CheckBoxMd) {
-    final match = RegExp(r"\[((?:\x|\ ))\]\ (\S[^\n]*?)$").firstMatch(text.trim());
+    final match = RegExp(
+      r"\[((?:\x|\ ))\]\ (\S[^\n]*?)$",
+    ).firstMatch(text.trim());
     if (match != null) {
       final item = match[2]?.trim() ?? "";
       return "${_extractPlainText(item, false)}\n";
     }
   }
-  
+
   // Radio buttons
   if (component is RadioButtonMd) {
-    final match = RegExp(r"\(((?:\x|\ ))\)\ (\S[^\n]*)$").firstMatch(text.trim());
+    final match = RegExp(
+      r"\(((?:\x|\ ))\)\ (\S[^\n]*)$",
+    ).firstMatch(text.trim());
     if (match != null) {
       final item = match[2]?.trim() ?? "";
       return "${_extractPlainText(item, false)}\n";
     }
   }
-  
+
   // Horizontal lines
   if (component is HrLine) {
     // Skip horizontal lines in TTS - they're visual separators, not meant to be read
     return "";
   }
-  
+
   // Block quotes
   if (component is BlockQuote) {
     final match = RegExp(
@@ -729,7 +785,7 @@ String _extractTextFromBlockComponent(
       return "${_extractPlainText(data, true)}\n";
     }
   }
-  
+
   // Tables
   if (component is TableMd) {
     final lines = text.split('\n').where((e) => e.trim().isNotEmpty).toList();
@@ -738,16 +794,20 @@ String _extractTextFromBlockComponent(
       final cells = line.trim().split('|').where((e) => e.isNotEmpty).toList();
       if (cells.isNotEmpty) {
         // Skip separator rows (containing only dashes and colons)
-        final isSeparator = cells.every((cell) => RegExp(r"^:?[-:]+:?$").hasMatch(cell.trim()));
+        final isSeparator = cells.every(
+          (cell) => RegExp(r"^:?[-:]+:?$").hasMatch(cell.trim()),
+        );
         if (!isSeparator) {
-          final cellTexts = cells.map((cell) => _extractPlainText(cell.trim(), false)).join(" | ");
+          final cellTexts = cells
+              .map((cell) => _extractPlainText(cell.trim(), false))
+              .join(" | ");
           buffer.writeln(cellTexts);
         }
       }
     }
     return buffer.toString();
   }
-  
+
   // Indent
   if (component is IndentMd) {
     final match = RegExp(r"^(\ \ +)([^\n]+)$").firstMatch(text);
@@ -756,18 +816,18 @@ String _extractTextFromBlockComponent(
       return "${_extractPlainText(content, false)}\n";
     }
   }
-  
+
   // LaTeX multiline
   if (component is LatexMathMultiLine) {
     // Replace LaTeX with placeholder so TTS acknowledges math content
     return " [mathematical expression] ";
   }
-  
+
   // New lines
   if (component is NewLines) {
     return "\n\n";
   }
-  
+
   return "";
 }
 
@@ -779,37 +839,48 @@ String _extractTextFromInlineComponent(
 ) {
   // Bold
   if (component is BoldMd) {
-    final match = RegExp(r"(?<!\*)\*\*(?<!\s)(.+?)(?<!\s)\*\*(?!\*)").firstMatch(text.trim());
+    final match = RegExp(
+      r"(?<!\*)\*\*(?<!\s)(.+?)(?<!\s)\*\*(?!\*)",
+    ).firstMatch(text.trim());
     if (match != null) {
       return _extractPlainText(match[1] ?? "", false);
     }
   }
-  
+
   // Italic
   if (component is ItalicMd) {
-    final match = RegExp(r"(?:(?<!\*)\*(?<!\s)(.+?)(?<!\s)\*(?!\*))", dotAll: true).firstMatch(text.trim());
+    final match = RegExp(
+      r"(?:(?<!\*)\*(?<!\s)(.+?)(?<!\s)\*(?!\*))",
+      dotAll: true,
+    ).firstMatch(text.trim());
     if (match != null) {
       final data = match[1] ?? match[2];
       return _extractPlainText(data ?? "", false);
     }
   }
-  
+
   // Strikethrough
   if (component is StrikeMd) {
-    final match = RegExp(r"(?<!\*)\~\~(?<!\s)(.+?)(?<!\s)\~\~(?!\*)").firstMatch(text.trim());
+    final match = RegExp(
+      r"(?<!\*)\~\~(?<!\s)(.+?)(?<!\s)\~\~(?!\*)",
+    ).firstMatch(text.trim());
     if (match != null) {
       return _extractPlainText(match[1] ?? "", false);
     }
   }
-  
+
   // Underline
   if (component is UnderLineMd) {
-    final match = RegExp(r"<u>(.*?)(?:</u>|$)", multiLine: true, dotAll: true).firstMatch(text.trim());
+    final match = RegExp(
+      r"<u>(.*?)(?:</u>|$)",
+      multiLine: true,
+      dotAll: true,
+    ).firstMatch(text.trim());
     if (match != null) {
       return _extractPlainText(match[1] ?? "", false);
     }
   }
-  
+
   // Highlighted text (code spans)
   if (component is HighlightedText) {
     final match = RegExp(r"`(?!`)(.+?)(?<!`)`(?!`)").firstMatch(text.trim());
@@ -817,7 +888,7 @@ String _extractTextFromInlineComponent(
       return match[1] ?? "";
     }
   }
-  
+
   // Links
   if (component is ATagMd) {
     // Extract link text, not URL
@@ -840,14 +911,16 @@ String _extractTextFromInlineComponent(
       return _extractPlainText(linkText, false);
     }
   }
-  
+
   // Images
   if (component is ImageMd) {
     final match = RegExp(r'\!\[([^\[\]]*)\]\(').firstMatch(text.trim());
     if (match != null) {
       final altText = match[1] ?? "";
       // Extract size info if present
-      final sizeMatch = RegExp(r"^([0-9]+)?x?([0-9]+)?").firstMatch(altText.trim());
+      final sizeMatch = RegExp(
+        r"^([0-9]+)?x?([0-9]+)?",
+      ).firstMatch(altText.trim());
       if (sizeMatch != null && (sizeMatch[1] != null || sizeMatch[2] != null)) {
         // Has size info, skip for TTS
         return "";
@@ -855,18 +928,18 @@ String _extractTextFromInlineComponent(
       return altText.isNotEmpty ? "Image: $altText" : "Image";
     }
   }
-  
+
   // Inline LaTeX
   if (component is LatexMath) {
     // Replace LaTeX with placeholder so TTS acknowledges math content
     return " [mathematical expression] ";
   }
-  
+
   // Source tags
   if (component is SourceTag) {
     // Skip source tags for TTS
     return "";
   }
-  
+
   return "";
 }

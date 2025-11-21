@@ -12,7 +12,7 @@ class BlockQuoteWidget extends StatelessWidget {
     required this.child,
     required this.direction,
     required this.color,
-    this.width = 3,
+    this.width = 4,
   });
 
   /// The child widget to be indented.
@@ -29,40 +29,41 @@ class BlockQuoteWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Flexible(
-          child: CustomPaint(
-            foregroundPainter: BlockQuotePainter(color, direction, width),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor =
+        isDark
+            ? Colors.white.withOpacity(0.05)
+            : Colors.black.withOpacity(0.03);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.only(
+          topRight: Radius.circular(8),
+          bottomRight: Radius.circular(8),
+          topLeft: Radius.circular(2),
+          bottomLeft: Radius.circular(2),
+        ),
+        border: Border(left: BorderSide(color: color, width: width)),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: 4,
+            left: 6,
+            child: Icon(
+              Icons.format_quote_rounded,
+              size: 16,
+              color: color.withOpacity(0.3),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(28, 12, 16, 12),
             child: child,
           ),
-        ),
-      ],
+        ],
+      ),
     );
-  }
-}
-
-/// A custom painter that draws an indent on a canvas.
-///
-/// The [BlockQuotePainter] class extends CustomPainter and is responsible for
-/// painting the indent on a canvas. It takes a [color] and [direction] parameter
-/// and uses them to draw an indent in the UI.
-class BlockQuotePainter extends CustomPainter {
-  BlockQuotePainter(this.color, this.direction, this.width);
-  final Color color;
-  final TextDirection direction;
-  final double width;
-  @override
-  void paint(Canvas canvas, Size size) {
-    var left = direction == TextDirection.ltr;
-    var start = left ? 0.0 : size.width - width;
-    var rect = Rect.fromLTWH(start, 0, width, size.height);
-    var paint = Paint()..color = color;
-    canvas.drawRect(rect, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return true;
   }
 }

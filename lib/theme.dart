@@ -14,6 +14,8 @@ class GptMarkdownThemeData extends ThemeExtension<GptMarkdownThemeData> {
     required this.hrLineColor,
     required this.linkColor,
     required this.linkHoverColor,
+    this.codeBlockBackgroundColor,
+    this.codeBlockHeaderColor,
   });
 
   /// A factory constructor for `GptMarkdownThemeData`.
@@ -30,6 +32,8 @@ class GptMarkdownThemeData extends ThemeExtension<GptMarkdownThemeData> {
     Color? hrLineColor,
     Color? linkColor,
     Color? linkHoverColor,
+    Color? codeBlockBackgroundColor,
+    Color? codeBlockHeaderColor,
   }) {
     ThemeData themeData = switch (brightness) {
       Brightness.light => ThemeData.light(),
@@ -68,6 +72,8 @@ class GptMarkdownThemeData extends ThemeExtension<GptMarkdownThemeData> {
       hrLineColor: hrLineColor,
       linkColor: linkColor,
       linkHoverColor: linkHoverColor,
+      codeBlockBackgroundColor: codeBlockBackgroundColor,
+      codeBlockHeaderColor: codeBlockHeaderColor,
     );
   }
 
@@ -75,8 +81,9 @@ class GptMarkdownThemeData extends ThemeExtension<GptMarkdownThemeData> {
     ThemeData theme,
     TextTheme textTheme,
   ) {
+    final isDark = theme.brightness == Brightness.dark;
     return GptMarkdownThemeData._(
-      highlightColor: theme.colorScheme.onSurfaceVariant.withAlpha(50),
+      highlightColor: theme.colorScheme.onSurfaceVariant.withAlpha(15),
       h1: textTheme.headlineLarge,
       h2: textTheme.headlineMedium,
       h3: textTheme.headlineSmall,
@@ -87,6 +94,10 @@ class GptMarkdownThemeData extends ThemeExtension<GptMarkdownThemeData> {
       hrLineColor: theme.colorScheme.outline,
       linkColor: Colors.blue,
       linkHoverColor: Colors.red,
+      codeBlockBackgroundColor:
+          isDark ? const Color(0xFF1E1E1E) : const Color(0xFFFAFAFA),
+      codeBlockHeaderColor:
+          isDark ? const Color(0xFF252526) : const Color(0xFFF3F3F3),
     );
   }
 
@@ -121,6 +132,12 @@ class GptMarkdownThemeData extends ThemeExtension<GptMarkdownThemeData> {
   /// The color of the link when hovering.
   Color linkHoverColor;
 
+  /// The background color of the code block.
+  Color? codeBlockBackgroundColor;
+
+  /// The header color of the code block.
+  Color? codeBlockHeaderColor;
+
   /// A method to copy the `GptMarkdownThemeData`.
   @override
   GptMarkdownThemeData copyWith({
@@ -135,6 +152,8 @@ class GptMarkdownThemeData extends ThemeExtension<GptMarkdownThemeData> {
     Color? hrLineColor,
     Color? linkColor,
     Color? linkHoverColor,
+    Color? codeBlockBackgroundColor,
+    Color? codeBlockHeaderColor,
   }) {
     return GptMarkdownThemeData._(
       highlightColor: highlightColor ?? this.highlightColor,
@@ -148,6 +167,9 @@ class GptMarkdownThemeData extends ThemeExtension<GptMarkdownThemeData> {
       hrLineColor: hrLineColor ?? this.hrLineColor,
       linkColor: linkColor ?? this.linkColor,
       linkHoverColor: linkHoverColor ?? this.linkHoverColor,
+      codeBlockBackgroundColor:
+          codeBlockBackgroundColor ?? this.codeBlockBackgroundColor,
+      codeBlockHeaderColor: codeBlockHeaderColor ?? this.codeBlockHeaderColor,
     );
   }
 
@@ -173,6 +195,16 @@ class GptMarkdownThemeData extends ThemeExtension<GptMarkdownThemeData> {
       linkColor: Color.lerp(linkColor, other.linkColor, t) ?? linkColor,
       linkHoverColor:
           Color.lerp(linkHoverColor, other.linkHoverColor, t) ?? linkHoverColor,
+      codeBlockBackgroundColor:
+          Color.lerp(
+            codeBlockBackgroundColor,
+            other.codeBlockBackgroundColor,
+            t,
+          ) ??
+          codeBlockBackgroundColor,
+      codeBlockHeaderColor:
+          Color.lerp(codeBlockHeaderColor, other.codeBlockHeaderColor, t) ??
+          codeBlockHeaderColor,
     );
   }
 }
